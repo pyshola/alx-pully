@@ -1,144 +1,63 @@
-'use client'
+"use client";
 
-import Link from 'next/link'
-import { Plus, TrendingUp, Users, Clock, LogOut } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import Link from "next/link";
+import { Plus, TrendingUp, Users, Clock, LogOut } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
-import { PollCard } from '@/components/polls/poll-card'
-import { useAuth } from '@/contexts/auth-context'
-import { useRouter } from 'next/navigation'
-import { ProtectedRoute } from '@/components/auth/protected-route'
+} from "@/components/ui/card";
+import { PollCard } from "@/components/polls/poll-card";
+import { useAuth } from "@/contexts/auth-context";
+import { usePolls, useUserStats } from "@/hooks/use-polls";
+import { useRouter } from "next/navigation";
 
-// Mock data - replace with actual data fetching
-const mockStats = {
-  totalPolls: 12,
-  totalVotes: 1486,
-  activePolls: 8,
-  avgVotesPerPoll: 124,
-}
+export default function DashboardPage() {
+  const { user, signOut, loading: authLoading } = useAuth();
+  const router = useRouter();
 
-const mockRecentPolls = [
-  {
-    id: '1',
-    title: "What's your favorite programming language?",
-    description:
-      'Help us understand the preferences of our developer community.',
-    options: [
-      {
-        id: '1',
-        pollId: '1',
-        text: 'JavaScript',
-        order: 1,
-        votes: [],
-        _count: { votes: 45 },
-      },
-      {
-        id: '2',
-        pollId: '1',
-        text: 'Python',
-        order: 2,
-        votes: [],
-        _count: { votes: 38 },
-      },
-      {
-        id: '3',
-        pollId: '1',
-        text: 'TypeScript',
-        order: 3,
-        votes: [],
-        _count: { votes: 32 },
-      },
-      {
-        id: '4',
-        pollId: '1',
-        text: 'Go',
-        order: 4,
-        votes: [],
-        _count: { votes: 15 },
-      },
-    ],
-    creatorId: 'user1',
-    creator: {
-      id: 'user1',
-      email: 'user@example.com',
-      username: 'johndoe',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    isPublic: true,
-    allowMultipleVotes: false,
-    createdAt: new Date('2024-01-15'),
-    updatedAt: new Date('2024-01-15'),
-    _count: { votes: 130 },
-  },
-  {
-    id: '2',
-    title: 'Best time for team meetings?',
-    description: "Let's find a time that works for everyone on the team.",
-    options: [
-      {
-        id: '5',
-        pollId: '2',
-        text: '9:00 AM',
-        order: 1,
-        votes: [],
-        _count: { votes: 22 },
-      },
-      {
-        id: '6',
-        pollId: '2',
-        text: '10:00 AM',
-        order: 2,
-        votes: [],
-        _count: { votes: 28 },
-      },
-      {
-        id: '7',
-        pollId: '2',
-        text: '2:00 PM',
-        order: 3,
-        votes: [],
-        _count: { votes: 18 },
-      },
-      {
-        id: '8',
-        pollId: '2',
-        text: '3:00 PM',
-        order: 4,
-        votes: [],
-        _count: { votes: 12 },
-      },
-    ],
-    creatorId: 'user1',
-    creator: {
-      id: 'user1',
-      email: 'user@example.com',
-      username: 'johndoe',
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    },
-    isPublic: false,
-    allowMultipleVotes: false,
-    expiresAt: new Date('2024-02-01'),
-    createdAt: new Date('2024-01-10'),
-    updatedAt: new Date('2024-01-10'),
-    _count: { votes: 80 },
-  },
-]
+  // Get user's polls (limit to recent 6 for dashboard)
+  const {
+    polls: userPolls,
+    loading: pollsLoading,
+    error: pollsError,
+    refreshPolls,
+  } = usePolls({
+    userId: user?.id,
+    limit: 6,
+    autoFetch: !!user?.id,
+  });
 
-function DashboardPage() {
-  const { user, signOut } = useAuth()
-  const router = useRouter()
+  // Get user statistics
+  const {
+    stats,
+    loading: statsLoading,
+    error: statsError,
+  } = useUserStats(user?.id);
 
   const handleSignOut = async () => {
-    await signOut()
-    router.push('/login')
+    await signOut();
+    router.push("/login");
+  };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    // Redirect to login if not authenticated after loading
+    router.push("/login");
+    return null; // or a loading spinner while redirecting
   }
 
   return (
@@ -148,7 +67,7 @@ function DashboardPage() {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              Welcome back, {user?.email}!
+              Welcome back, {user.email}!
             </h1>
             <p className="mt-2 text-gray-600">
               Manage your polls and track their performance
@@ -176,9 +95,11 @@ function DashboardPage() {
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockStats.totalPolls}</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? "..." : stats?.total_polls || 0}
+              </div>
               <p className="text-xs text-muted-foreground">
-                +2 from last month
+                Polls you've created
               </p>
             </CardContent>
           </Card>
@@ -190,10 +111,12 @@ function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockStats.totalVotes.toLocaleString()}
+                {statsLoading
+                  ? "..."
+                  : (stats?.total_votes_received || 0).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                +12% from last month
+                Votes on your polls
               </p>
             </CardContent>
           </Card>
@@ -206,24 +129,26 @@ function DashboardPage() {
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{mockStats.activePolls}</div>
+              <div className="text-2xl font-bold">
+                {statsLoading ? "..." : stats?.active_polls || 0}
+              </div>
               <p className="text-xs text-muted-foreground">Currently running</p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Avg Votes/Poll
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Total Views</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">
-                {mockStats.avgVotesPerPoll}
+                {statsLoading
+                  ? "..."
+                  : (stats?.total_views || 0).toLocaleString()}
               </div>
               <p className="text-xs text-muted-foreground">
-                +8% from last month
+                Views on your polls
               </p>
             </CardContent>
           </Card>
@@ -238,13 +163,75 @@ function DashboardPage() {
             </Button>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            {mockRecentPolls.map((poll) => (
-              <PollCard key={poll.id} poll={poll} showResults={true} />
-            ))}
-          </div>
+          {pollsError && (
+            <div className="p-4 mb-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+              Error loading polls: {pollsError}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={refreshPolls}
+                className="ml-4"
+              >
+                Retry
+              </Button>
+            </div>
+          )}
 
-          {mockRecentPolls.length === 0 && (
+          {pollsLoading ? (
+            <div className="grid gap-6 md:grid-cols-2">
+              {[...Array(4)].map((_, i) => (
+                <Card key={i} className="animate-pulse">
+                  <CardHeader>
+                    <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded"></div>
+                      <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid gap-6 md:grid-cols-2">
+              {userPolls.map((poll) => {
+                // Convert database poll to expected format for PollCard
+                const convertedPoll = {
+                  ...poll,
+                  description: poll.description ?? undefined, // Convert null to undefined
+                  creatorId: poll.creator_id,
+                  isPublic: poll.is_public,
+                  allowMultipleVotes: poll.allow_multiple_votes,
+                  expiresAt: poll.expires_at
+                    ? new Date(poll.expires_at)
+                    : undefined,
+                  createdAt: new Date(poll.created_at),
+                  updatedAt: new Date(poll.updated_at),
+                  options:
+                    poll.options?.map((option) => ({
+                      ...option,
+                      pollId: poll.id,
+                      order: option.order_index,
+                      votes: [],
+                      _count: { votes: option.vote_count || 0 },
+                    })) || [],
+                  _count: { votes: poll.vote_count || 0 },
+                };
+
+                return (
+                  <PollCard
+                    key={poll.id}
+                    poll={convertedPoll}
+                    showResults={true}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {!pollsLoading && userPolls.length === 0 && (
             <Card>
               <CardContent className="flex flex-col items-center justify-center py-12">
                 <div className="text-center">
@@ -264,6 +251,20 @@ function DashboardPage() {
               </CardContent>
             </Card>
           )}
+
+          {/* Show more polls link if user has more than the displayed amount */}
+          {!pollsLoading &&
+            userPolls.length > 0 &&
+            stats &&
+            stats.total_polls > userPolls.length && (
+              <div className="text-center pt-6">
+                <Button variant="outline" asChild>
+                  <Link href={`/polls?userId=${user?.id}`}>
+                    View All My Polls ({stats?.total_polls || 0})
+                  </Link>
+                </Button>
+              </div>
+            )}
         </div>
 
         {/* Quick Actions */}
@@ -302,14 +303,14 @@ function DashboardPage() {
 
             <Card className="cursor-pointer hover:shadow-md transition-shadow">
               <CardHeader>
-                <CardTitle className="text-lg">Analytics</CardTitle>
+                <CardTitle className="text-lg">My Profile</CardTitle>
                 <CardDescription>
-                  View detailed insights about your polls
+                  Update your profile and account settings
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/analytics">View Analytics</Link>
+                  <Link href="/profile">View Profile</Link>
                 </Button>
               </CardContent>
             </Card>
@@ -317,13 +318,5 @@ function DashboardPage() {
         </div>
       </div>
     </div>
-  )
-}
-
-export default function ProtectedDashboardPage() {
-  return (
-    <ProtectedRoute>
-      <DashboardPage />
-    </ProtectedRoute>
-  )
+  );
 }

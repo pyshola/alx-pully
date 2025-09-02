@@ -238,4 +238,122 @@ alx-pully/
         └── 001_create_profiles.sql # Database schema
 ```
 
-Your authentication system is now fully configured and ready to use!
+## 11. Database Schema Setup
+
+After setting up authentication, you need to create the database schema for polls and votes.
+
+### Run Database Migrations
+
+1. **Using Supabase Dashboard** (Recommended for beginners):
+   - Go to your Supabase dashboard → **SQL Editor**
+   - Create a new query
+   - Copy and paste the contents of `supabase/migrations/002_create_polls_schema.sql`
+   - Click "Run" to execute the migration
+
+2. **Using Supabase CLI** (Recommended for developers):
+   ```bash
+   # Run the polls schema migration
+   supabase db push
+   ```
+
+### What the Schema Creates
+
+The migration creates the following tables:
+
+#### **polls** table:
+- Stores poll information (title, description, creator, settings)
+- Supports public/private polls, multiple votes, anonymous voting
+- Includes expiration dates and timestamps
+
+#### **poll_options** table:
+- Stores the options for each poll
+- Ordered options with unique constraints
+
+#### **votes** table:
+- Records individual votes with user or fingerprint tracking
+- Prevents duplicate votes based on poll settings
+- Supports both authenticated and anonymous voting
+
+#### **poll_views** table:
+- Tracks poll views for analytics
+- Prevents duplicate view counting
+
+#### **poll_shares** table:
+- Tracks how polls are shared (optional)
+- Records share methods and recipients
+
+#### **popular_polls** materialized view:
+- Pre-calculated popular polls based on votes, views, and recency
+- Refreshed periodically for performance
+
+### Database Functions
+
+The schema includes several PostgreSQL functions:
+
+- `get_poll_results(poll_uuid)` - Returns poll results with percentages
+- `get_user_poll_stats(user_uuid)` - Returns user's poll statistics
+- `refresh_popular_polls()` - Refreshes the popular polls view
+- `validate_vote()` - Ensures vote constraints are enforced
+- `handle_updated_at()` - Automatically updates timestamps
+
+### Row Level Security (RLS)
+
+All tables have RLS enabled with appropriate policies:
+
+- **Polls**: Users can view public polls or their own polls
+- **Options**: Visible based on poll access
+- **Votes**: Can vote on accessible polls, view aggregated results
+- **Views/Shares**: Analytics data accessible to poll creators
+
+### Testing the Schema
+
+After running the migration, test the setup:
+
+1. **Create a Poll**:
+   ```bash
+   curl -X POST http://localhost:3000/api/polls \
+     -H "Content-Type: application/json" \
+     -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -d '{
+       "title": "Test Poll",
+       "options": ["Option 1", "Option 2"],
+       "is_public": true,
+       "allow_multiple_votes": false
+     }'
+   ```
+
+2. **Vote on a Poll**:
+   ```bash
+   curl -X POST http://localhost:3000/api/polls/POLL_ID/vote \
+     -H "Content-Type: application/json" \
+     -d '{
+       "option_ids": ["OPTION_ID"]
+     }'
+   ```
+
+3. **View Results**:
+   - Navigate to `http://localhost:3000/polls/POLL_ID`
+   - Results should display with percentages
+
+## 12. Performance Optimization
+
+### Database Indexes
+
+The schema includes optimized indexes for:
+- Poll queries by creator, public status, creation date
+- Vote counting and aggregation
+- Search functionality
+- Analytics queries
+
+### Materialized Views
+
+The `popular_polls` view is materialized for better performance:
+
+```sql
+-- Refresh popular polls (run periodically)
+SELECT refresh_popular_polls();
+```
+
+Consider setting up a cron job to refresh this view regularly.
+
+Your authentication system and database schema are now fully configured and ready to use!

@@ -1,11 +1,11 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -13,85 +13,85 @@ import {
   CardFooter,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
-import { useAuth } from '@/contexts/auth-context'
-import { isValidEmail } from '@/lib/utils'
-import { supabase } from '@/lib/supabase'
+} from "@/components/ui/card";
+import { useAuth } from "@/contexts/auth-context";
+import { isValidEmail } from "@/lib/utils";
+import { supabase } from "@/lib/supabase-client";
 
 interface LoginFormProps {
-  redirectTo?: string
+  redirectTo?: string;
 }
 
 export function LoginForm({ redirectTo }: LoginFormProps) {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const { loading } = useAuth()
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { loading } = useAuth();
 
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-  })
+    email: "",
+    password: "",
+  });
 
   const finalRedirectTo =
-    redirectTo || searchParams.get('redirectTo') || '/dashboard'
+    redirectTo || searchParams.get("redirectTo") || "/dashboard";
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
+    const { name, value } = e.target;
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-    }))
-    if (error) setError(null)
-  }
+    }));
+    if (error) setError(null);
+  };
 
   const validateForm = (): boolean => {
     if (!formData.email.trim()) {
-      setError('Email is required')
-      return false
+      setError("Email is required");
+      return false;
     }
 
     if (!isValidEmail(formData.email)) {
-      setError('Please enter a valid email address')
-      return false
+      setError("Please enter a valid email address");
+      return false;
     }
 
     if (!formData.password) {
-      setError('Password is required')
-      return false
+      setError("Password is required");
+      return false;
     }
 
-    return true
-  }
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!validateForm()) return
+    if (!validateForm()) return;
 
-    setError(null)
+    setError(null);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword(formData)
+      const { error } = await supabase.auth.signInWithPassword(formData);
 
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          setError('Invalid email or password')
-        } else if (error.message.includes('Email not confirmed')) {
+        if (error.message.includes("Invalid login credentials")) {
+          setError("Invalid email or password");
+        } else if (error.message.includes("Email not confirmed")) {
           setError(
-            'Please check your email and click the confirmation link before signing in',
-          )
+            "Please check your email and click the confirmation link before signing in",
+          );
         } else {
-          setError(error.message || 'An error occurred during sign in')
+          setError(error.message || "An error occurred during sign in");
         }
-        return
+        return;
       }
 
-      router.push(finalRedirectTo)
+      router.push(finalRedirectTo);
     } catch (error) {
-      setError('An unexpected error occurred. Please try again.')
+      setError("An unexpected error occurred. Please try again.");
     }
-  }
+  };
 
   return (
     <Card className="w-full max-w-md mx-auto">
@@ -142,7 +142,7 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
 
         <CardFooter className="flex flex-col space-y-4">
           <Button type="submit" className="w-full" disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? "Signing in..." : "Sign In"}
           </Button>
 
           <div className="text-center text-sm">
@@ -162,5 +162,5 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
         </CardFooter>
       </form>
     </Card>
-  )
+  );
 }

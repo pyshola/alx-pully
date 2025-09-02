@@ -1,168 +1,241 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import { Plus, X, Calendar } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CreatePollData } from "@/types"
-import { createAuthHeaders } from "@/lib/auth"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Plus, X, Calendar } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { useAuth } from "@/contexts/auth-context";
+import { createClientSupabase } from "@/lib/supabase-client";
+import { CreatePollForm as CreatePollFormType, Poll } from "@/types/database";
+import { PollCreatedSuccess } from "./poll-created-success";
 
 interface CreatePollFormProps {
-  onSuccess?: (pollId: string) => void
+  onSuccess?: (pollId: string) => void;
 }
 
 export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
-  const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const [formData, setFormData] = useState<CreatePollData>({
+  const router = useRouter();
+  const { user } = useAuth();
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [createdPoll, setCreatedPoll] = useState<Poll | null>(null);
+  const [formData, setFormData] = useState<CreatePollFormType>({
     title: "",
     description: "",
     options: ["", ""],
-    isPublic: true,
-    allowMultipleVotes: false,
-  })
+    is_public: true,
+    allow_multiple_votes: false,
+    allow_anonymous_votes: true,
+  });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value, type } = e.target
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+  ) => {
+    const { name, value, type } = e.target;
 
     if (type === "checkbox") {
-      const checked = (e.target as HTMLInputElement).checked
-      setFormData(prev => ({
+      const checked = (e.target as HTMLInputElement).checked;
+      setFormData((prev) => ({
         ...prev,
         [name]: checked,
-      }))
+      }));
     } else if (type === "datetime-local") {
-      const date = value ? new Date(value) : undefined
-      setFormData(prev => ({
+      const date = value ? new Date(value) : null;
+      setFormData((prev) => ({
         ...prev,
         [name]: date,
-      }))
+      }));
     } else {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         [name]: value,
-      }))
+      }));
     }
 
-    if (error) setError(null)
-  }
+    if (error) setError(null);
+  };
 
   const handleOptionChange = (index: number, value: string) => {
-    const newOptions = [...formData.options]
-    newOptions[index] = value
-    setFormData(prev => ({
+    const newOptions = [...formData.options];
+    newOptions[index] = value;
+    setFormData((prev) => ({
       ...prev,
       options: newOptions,
-    }))
+    }));
 
-    if (error) setError(null)
-  }
+    if (error) setError(null);
+  };
 
   const addOption = () => {
     if (formData.options.length < 10) {
-      setFormData(prev => ({
+      setFormData((prev) => ({
         ...prev,
         options: [...prev.options, ""],
-      }))
+      }));
     }
-  }
+  };
 
   const removeOption = (index: number) => {
     if (formData.options.length > 2) {
-      const newOptions = formData.options.filter((_, i) => i !== index)
-      setFormData(prev => ({
+      const newOptions = formData.options.filter((_, i) => i !== index);
+      setFormData((prev) => ({
         ...prev,
         options: newOptions,
-      }))
+      }));
     }
-  }
+  };
 
   const validateForm = (): boolean => {
     if (!formData.title.trim()) {
-      setError("Poll title is required")
-      return false
+      setError("Poll title is required");
+      return false;
     }
 
     if (formData.title.length < 5) {
-      setError("Poll title must be at least 5 characters long")
-      return false
+      setError("Poll title must be at least 5 characters long");
+      return false;
     }
 
-    const validOptions = formData.options.filter(option => option.trim())
+    if (formData.title.length > 500) {
+      setError("Poll title must be 500 characters or less");
+      return false;
+    }
+
+    if (formData.description && formData.description.length > 2000) {
+      setError("Description must be 2000 characters or less");
+      return false;
+    }
+
+    const validOptions = formData.options.filter((option) => option.trim());
 
     if (validOptions.length < 2) {
-      setError("At least 2 poll options are required")
-      return false
+      setError("At least 2 poll options are required");
+      return false;
     }
 
-    if (validOptions.some(option => option.length < 1)) {
-      setError("All options must have at least 1 character")
-      return false
+    if (validOptions.some((option) => option.length < 1)) {
+      setError("All options must have at least 1 character");
+      return false;
+    }
+
+    if (validOptions.some((option) => option.length > 1000)) {
+      setError("Option text must be 1000 characters or less");
+      return false;
     }
 
     // Check for duplicate options
-    const uniqueOptions = new Set(validOptions.map(option => option.toLowerCase().trim()))
+    const uniqueOptions = new Set(
+      validOptions.map((option) => option.toLowerCase().trim()),
+    );
     if (uniqueOptions.size !== validOptions.length) {
-      setError("Poll options must be unique")
-      return false
+      setError("Poll options must be unique");
+      return false;
     }
 
     // Validate expiration date
-    if (formData.expiresAt && formData.expiresAt <= new Date()) {
-      setError("Expiration date must be in the future")
-      return false
+    if (formData.expires_at && formData.expires_at <= new Date()) {
+      setError("Expiration date must be in the future");
+      return false;
     }
 
-    return true
-  }
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+    e.preventDefault();
 
-    if (!validateForm()) return
+    if (!user) {
+      setError("You must be logged in to create a poll");
+      return;
+    }
 
-    setIsLoading(true)
-    setError(null)
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const validOptions = formData.options.filter(option => option.trim())
+      const supabase = createClientSupabase();
+
+      // Get the current session to ensure we have a valid token
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        setError("Authentication expired. Please log in again.");
+        return;
+      }
+
+      const validOptions = formData.options.filter((option) => option.trim());
 
       const pollData = {
         ...formData,
         options: validOptions,
-      }
+        description: formData.description || undefined,
+      };
 
       const response = await fetch("/api/polls", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...createAuthHeaders(),
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify(pollData),
-      })
+      });
 
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || "Failed to create poll")
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to create poll");
       }
 
-      const { poll } = await response.json()
+      const { poll } = await response.json();
 
       if (onSuccess) {
-        onSuccess(poll.id)
+        onSuccess(poll.id);
       } else {
-        router.push(`/polls/${poll.id}`)
+        setCreatedPoll(poll);
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "An unexpected error occurred")
+      setError(
+        error instanceof Error ? error.message : "An unexpected error occurred",
+      );
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
+  };
+
+  const handleCreateAnother = () => {
+    setCreatedPoll(null);
+    setFormData({
+      title: "",
+      description: "",
+      options: ["", ""],
+      is_public: true,
+      allow_multiple_votes: false,
+      allow_anonymous_votes: true,
+    });
+    setError(null);
+  };
+
+  // Show success screen if poll was created
+  if (createdPoll) {
+    return (
+      <PollCreatedSuccess
+        poll={createdPoll}
+        onCreateAnother={handleCreateAnother}
+      />
+    );
   }
 
   return (
@@ -192,11 +265,11 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
               value={formData.title}
               onChange={handleInputChange}
               disabled={isLoading}
-              maxLength={200}
+              maxLength={500}
               required
             />
             <p className="text-xs text-muted-foreground">
-              {formData.title.length}/200 characters
+              {formData.title.length}/500 characters
             </p>
           </div>
 
@@ -210,11 +283,11 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
               value={formData.description}
               onChange={handleInputChange}
               disabled={isLoading}
-              maxLength={500}
+              maxLength={2000}
               rows={3}
             />
             <p className="text-xs text-muted-foreground">
-              {(formData.description || "").length}/500 characters
+              {(formData.description || "").length}/2000 characters
             </p>
           </div>
 
@@ -241,9 +314,11 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
                     <Input
                       placeholder={`Option ${index + 1}`}
                       value={option}
-                      onChange={(e) => handleOptionChange(index, e.target.value)}
+                      onChange={(e) =>
+                        handleOptionChange(index, e.target.value)
+                      }
                       disabled={isLoading}
-                      maxLength={100}
+                      maxLength={1000}
                     />
                   </div>
                   {formData.options.length > 2 && (
@@ -274,14 +349,14 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  id="isPublic"
-                  name="isPublic"
-                  checked={formData.isPublic}
+                  id="is_public"
+                  name="is_public"
+                  checked={formData.is_public}
                   onChange={handleInputChange}
                   disabled={isLoading}
                   className="rounded border-gray-300"
                 />
-                <Label htmlFor="isPublic" className="text-sm font-normal">
+                <Label htmlFor="is_public" className="text-sm font-normal">
                   Make this poll public (visible to everyone)
                 </Label>
               </div>
@@ -289,15 +364,36 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
               <div className="flex items-center space-x-2">
                 <input
                   type="checkbox"
-                  id="allowMultipleVotes"
-                  name="allowMultipleVotes"
-                  checked={formData.allowMultipleVotes}
+                  id="allow_multiple_votes"
+                  name="allow_multiple_votes"
+                  checked={formData.allow_multiple_votes}
                   onChange={handleInputChange}
                   disabled={isLoading}
                   className="rounded border-gray-300"
                 />
-                <Label htmlFor="allowMultipleVotes" className="text-sm font-normal">
+                <Label
+                  htmlFor="allow_multiple_votes"
+                  className="text-sm font-normal"
+                >
                   Allow multiple votes per person
+                </Label>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="allow_anonymous_votes"
+                  name="allow_anonymous_votes"
+                  checked={formData.allow_anonymous_votes}
+                  onChange={handleInputChange}
+                  disabled={isLoading}
+                  className="rounded border-gray-300"
+                />
+                <Label
+                  htmlFor="allow_anonymous_votes"
+                  className="text-sm font-normal"
+                >
+                  Allow anonymous (guest) voting
                 </Label>
               </div>
             </div>
@@ -305,17 +401,20 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
 
           {/* Expiration Date */}
           <div className="space-y-2">
-            <Label htmlFor="expiresAt">
+            <Label htmlFor="expires_at">
               <Calendar className="h-4 w-4 inline mr-1" />
               Expiration Date (optional)
             </Label>
             <Input
-              id="expiresAt"
-              name="expiresAt"
+              id="expires_at"
+              name="expires_at"
               type="datetime-local"
               value={
-                formData.expiresAt
-                  ? new Date(formData.expiresAt.getTime() - formData.expiresAt.getTimezoneOffset() * 60000)
+                formData.expires_at
+                  ? new Date(
+                      formData.expires_at.getTime() -
+                        formData.expires_at.getTimezoneOffset() * 60000,
+                    )
                       .toISOString()
                       .slice(0, 16)
                   : ""
@@ -340,16 +439,12 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
             >
               Cancel
             </Button>
-            <Button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1"
-            >
+            <Button type="submit" disabled={isLoading} className="flex-1">
               {isLoading ? "Creating Poll..." : "Create Poll"}
             </Button>
           </div>
         </CardContent>
       </form>
     </Card>
-  )
+  );
 }

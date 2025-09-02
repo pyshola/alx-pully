@@ -1,12 +1,31 @@
-import { Metadata } from 'next'
-import { CreatePollForm } from '@/components/polls/create-poll-form'
+"use client";
 
-export const metadata: Metadata = {
-  title: 'Create Poll | Alx Pully',
-  description: 'Create a new poll to gather opinions from your audience.',
-}
+import { Metadata } from "next";
+import { CreatePollForm } from "@/components/polls/create-poll-form";
+import { useAuth } from "@/contexts/auth-context";
+import { useRouter } from "next/navigation";
 
 export default function CreatePollPage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    // Redirect to login if not authenticated after loading
+    router.push("/login?redirectTo=/polls/create");
+    return null; // or a loading spinner while redirecting
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -16,8 +35,8 @@ export default function CreatePollPage() {
             Create a New Poll
           </h1>
           <p className="text-gray-600 max-w-2xl mx-auto">
-            Gather opinions, make decisions, and engage your audience with a custom poll.
-            Share it publicly or keep it private for your team.
+            Gather opinions, make decisions, and engage your audience with a
+            custom poll. Share it publicly or keep it private for your team.
           </p>
         </div>
 
@@ -47,10 +66,14 @@ export default function CreatePollPage() {
                 <span className="inline-block w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3 flex-shrink-0"></span>
                 Set an appropriate expiration date to create urgency
               </li>
+              <li className="flex items-start">
+                <span className="inline-block w-2 h-2 bg-blue-400 rounded-full mt-2 mr-3 flex-shrink-0"></span>
+                Enable anonymous voting to encourage honest responses
+              </li>
             </ul>
           </div>
         </div>
       </div>
     </div>
-  )
+  );
 }

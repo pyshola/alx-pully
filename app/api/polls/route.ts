@@ -1,152 +1,200 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { CreatePollData, Poll } from '@/types'
+import { NextRequest, NextResponse } from "next/server";
+import { createServerSupabase } from "@/lib/supabase-server";
+import { createPoll, getPolls, DatabaseError } from "@/lib/database";
+import { CreatePollForm } from "@/types/database";
 
 export async function GET(request: NextRequest) {
+  const supabase = createServerSupabase();
+
   try {
-    const { searchParams } = new URL(request.url)
-    const page = parseInt(searchParams.get('page') || '1')
-    const limit = parseInt(searchParams.get('limit') || '10')
-    const search = searchParams.get('search') || ''
-    const userId = searchParams.get('userId')
+    // Get query parameters
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get("page") || "1");
+    const limit = parseInt(searchParams.get("limit") || "10");
+    const search = searchParams.get("search") || undefined;
+    const userId = searchParams.get("userId") || undefined;
+    const isPublic = searchParams.get("isPublic")
+      ? searchParams.get("isPublic") === "true"
+      : undefined;
+    const orderBy = (searchParams.get("orderBy") || "created_at") as
+      | "created_at"
+      | "updated_at"
+      | "title";
+    const orderDirection = (searchParams.get("orderDirection") || "desc") as
+      | "asc"
+      | "desc";
 
-    // TODO: Implement actual database query
-    // This is a placeholder that returns mock data
+    const offset = (page - 1) * limit;
 
-    const mockPolls: Poll[] = [
-      {
-        id: '1',
-        title: 'What\'s your favorite programming language?',
-        description: 'Help us understand the preferences of our developer community.',
-        options: [
-          { id: '1', pollId: '1', text: 'JavaScript', order: 1, votes: [], _count: { votes: 45 } },
-          { id: '2', pollId: '1', text: 'Python', order: 2, votes: [], _count: { votes: 38 } },
-          { id: '3', pollId: '1', text: 'TypeScript', order: 3, votes: [], _count: { votes: 32 } },
-          { id: '4', pollId: '1', text: 'Go', order: 4, votes: [], _count: { votes: 15 } }
-        ],
-        creatorId: 'user1',
-        creator: { id: 'user1', email: 'user@example.com', username: 'johndoe', createdAt: new Date(), updatedAt: new Date() },
-        isPublic: true,
-        allowMultipleVotes: false,
-        createdAt: new Date('2024-01-15'),
-        updatedAt: new Date('2024-01-15'),
-        _count: { votes: 130 }
-      },
-      {
-        id: '2',
-        title: 'Best time for team meetings?',
-        description: 'Let\'s find a time that works for everyone on the team.',
-        options: [
-          { id: '5', pollId: '2', text: '9:00 AM', order: 1, votes: [], _count: { votes: 22 } },
-          { id: '6', pollId: '2', text: '10:00 AM', order: 2, votes: [], _count: { votes: 28 } },
-          { id: '7', pollId: '2', text: '2:00 PM', order: 3, votes: [], _count: { votes: 18 } },
-          { id: '8', pollId: '2', text: '3:00 PM', order: 4, votes: [], _count: { votes: 12 } }
-        ],
-        creatorId: 'user1',
-        creator: { id: 'user1', email: 'user@example.com', username: 'johndoe', createdAt: new Date(), updatedAt: new Date() },
-        isPublic: false,
-        allowMultipleVotes: false,
-        expiresAt: new Date('2024-02-01'),
-        createdAt: new Date('2024-01-10'),
-        updatedAt: new Date('2024-01-10'),
-        _count: { votes: 80 }
-      }
-    ]
+    // Get polls with pagination
+    const polls = await getPolls({
+      userId,
+      isPublic,
+      limit,
+      offset,
+      search,
+      orderBy,
+      orderDirection,
+    });
 
-    // Apply search filter
-    let filteredPolls = mockPolls
-    if (search) {
-      filteredPolls = mockPolls.filter(poll =>
-        poll.title.toLowerCase().includes(search.toLowerCase()) ||
-        poll.description?.toLowerCase().includes(search.toLowerCase())
-      )
-    }
+    // Get total count for pagination
+    let countQuery = supabase
+      .from("polls")
+      .select("*", { count: "exact", head: true });
 
-    // Apply user filter
     if (userId) {
-      filteredPolls = filteredPolls.filter(poll => poll.creatorId === userId)
+      countQuery = countQuery.eq("creator_id", userId);
     }
 
-    // Apply pagination
-    const startIndex = (page - 1) * limit
-    const endIndex = startIndex + limit
-    const paginatedPolls = filteredPolls.slice(startIndex, endIndex)
+    if (isPublic !== undefined) {
+      countQuery = countQuery.eq("is_public", isPublic);
+    }
+
+    if (search) {
+      countQuery = countQuery.or(
+        `title.ilike.%${search}%,description.ilike.%${search}%`,
+      );
+    }
+
+    const { count, error: countError } = await countQuery;
+
+    if (countError) {
+      console.error("Error getting poll count:", countError);
+      return NextResponse.json(
+        { error: "Failed to get poll count" },
+        { status: 500 },
+      );
+    }
+
+    const totalPages = Math.ceil((count || 0) / limit);
 
     return NextResponse.json({
-      data: paginatedPolls,
-      total: filteredPolls.length,
-      page,
-      limit,
-      totalPages: Math.ceil(filteredPolls.length / limit)
-    }, { status: 200 })
-
+      data: polls,
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages,
+        hasMore: page < totalPages,
+      },
+    });
   } catch (error) {
-    console.error('Get polls error:', error)
+    console.error("Get polls error:", error);
+
+    if (error instanceof DatabaseError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
 
 export async function POST(request: NextRequest) {
+  const supabase = createServerSupabase();
+
   try {
-    const body: CreatePollData = await request.json()
+    // Get the authenticated user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: "Authentication required" },
+        { status: 401 },
+      );
+    }
+
+    const body: CreatePollForm = await request.json();
 
     // Validate request body
     if (!body.title || !body.options || body.options.length < 2) {
       return NextResponse.json(
-        { error: 'Title and at least 2 options are required' },
-        { status: 400 }
-      )
+        { error: "Title and at least 2 options are required" },
+        { status: 400 },
+      );
     }
 
-    // TODO: Implement authentication check
-    // const token = request.headers.get('authorization')?.replace('Bearer ', '')
-    // if (!token) {
-    //   return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
-    // }
-
-    // TODO: Implement actual database creation
-    // This is a placeholder that simulates poll creation
-
-    const newPoll: Poll = {
-      id: Math.random().toString(36).substr(2, 9),
-      title: body.title,
-      description: body.description,
-      options: body.options.map((text, index) => ({
-        id: Math.random().toString(36).substr(2, 9),
-        pollId: Math.random().toString(36).substr(2, 9),
-        text,
-        order: index + 1,
-        votes: [],
-        _count: { votes: 0 }
-      })),
-      creatorId: 'user1', // TODO: Get from authenticated user
-      creator: {
-        id: 'user1',
-        email: 'user@example.com',
-        username: 'johndoe',
-        createdAt: new Date(),
-        updatedAt: new Date()
-      },
-      isPublic: body.isPublic,
-      allowMultipleVotes: body.allowMultipleVotes,
-      expiresAt: body.expiresAt,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      _count: { votes: 0 }
+    if (body.title.length > 500) {
+      return NextResponse.json(
+        { error: "Title must be 500 characters or less" },
+        { status: 400 },
+      );
     }
 
-    return NextResponse.json({
-      success: true,
-      poll: newPoll
-    }, { status: 201 })
+    if (body.description && body.description.length > 2000) {
+      return NextResponse.json(
+        { error: "Description must be 2000 characters or less" },
+        { status: 400 },
+      );
+    }
 
-  } catch (error) {
-    console.error('Create poll error:', error)
+    if (body.options.length > 10) {
+      return NextResponse.json(
+        { error: "Maximum 10 options allowed" },
+        { status: 400 },
+      );
+    }
+
+    // Validate option lengths
+    for (const option of body.options) {
+      if (!option.trim()) {
+        return NextResponse.json(
+          { error: "All options must have content" },
+          { status: 400 },
+        );
+      }
+      if (option.length > 1000) {
+        return NextResponse.json(
+          { error: "Option text must be 1000 characters or less" },
+          { status: 400 },
+        );
+      }
+    }
+
+    // Check for duplicate options
+    const uniqueOptions = [
+      ...new Set(body.options.map((opt) => opt.trim().toLowerCase())),
+    ];
+    if (uniqueOptions.length !== body.options.length) {
+      return NextResponse.json(
+        { error: "All options must be unique" },
+        { status: 400 },
+      );
+    }
+
+    // Validate expiration date
+    if (body.expires_at && new Date(body.expires_at) <= new Date()) {
+      return NextResponse.json(
+        { error: "Expiration date must be in the future" },
+        { status: 400 },
+      );
+    }
+
+    // Create the poll
+    const poll = await createPoll(body, user.id);
+
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+      {
+        success: true,
+        poll,
+      },
+      { status: 201 },
+    );
+  } catch (error) {
+    console.error("Create poll error:", error);
+
+    if (error instanceof DatabaseError) {
+      return NextResponse.json({ error: error.message }, { status: 400 });
+    }
+
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }
