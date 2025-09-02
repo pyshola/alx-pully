@@ -237,7 +237,7 @@ export function usePoll({
         .select(
           `
           *,
-          creator:profiles(*),
+          creator(*),
           options:poll_options(*)
         `,
         )

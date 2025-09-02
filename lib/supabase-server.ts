@@ -5,7 +5,7 @@ import { Database } from "@/types/database";
 
 export const createServerSupabase = () => {
   return createServerComponentClient<Database>({
-    cookies,
+    cookies: () => cookies(),
   });
 };
 

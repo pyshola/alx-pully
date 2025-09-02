@@ -100,7 +100,7 @@ export async function getPoll(
       .select(
         `
         *,
-        creator:profiles(*),
+        creator:auth.users(*),
         options:poll_options(*)
       `,
       )
@@ -210,7 +210,7 @@ export async function getPolls(options?: {
   try {
     let query = supabase.from("polls").select(`
         *,
-        creator:profiles(*),
+        creator(*),
         options:poll_options(*)
       `);
 
