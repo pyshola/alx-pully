@@ -14,10 +14,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { useAuth } from "@/contexts/auth-context";
-import { createClientSupabase } from "@/lib/supabase-client";
+
 import { CreatePollForm as CreatePollFormType, Poll } from "@/types/database";
 import { PollCreatedSuccess } from "./poll-created-success";
+import { createPollAction } from "@/lib/actions/poll";
 
 interface CreatePollFormProps {
   onSuccess?: (pollId: string) => void;
@@ -25,7 +25,6 @@ interface CreatePollFormProps {
 
 export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
   const router = useRouter();
-  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdPoll, setCreatedPoll] = useState<Poll | null>(null);
@@ -95,116 +94,28 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
     }
   };
 
-  const validateForm = (): boolean => {
-    if (!formData.title.trim()) {
-      setError("Poll title is required");
-      return false;
-    }
-
-    if (formData.title.length < 5) {
-      setError("Poll title must be at least 5 characters long");
-      return false;
-    }
-
-    if (formData.title.length > 500) {
-      setError("Poll title must be 500 characters or less");
-      return false;
-    }
-
-    if (formData.description && formData.description.length > 2000) {
-      setError("Description must be 2000 characters or less");
-      return false;
-    }
-
-    const validOptions = formData.options.filter((option) => option.trim());
-
-    if (validOptions.length < 2) {
-      setError("At least 2 poll options are required");
-      return false;
-    }
-
-    if (validOptions.some((option) => option.length < 1)) {
-      setError("All options must have at least 1 character");
-      return false;
-    }
-
-    if (validOptions.some((option) => option.length > 1000)) {
-      setError("Option text must be 1000 characters or less");
-      return false;
-    }
-
-    // Check for duplicate options
-    const uniqueOptions = new Set(
-      validOptions.map((option) => option.toLowerCase().trim()),
-    );
-    if (uniqueOptions.size !== validOptions.length) {
-      setError("Poll options must be unique");
-      return false;
-    }
-
-    // Validate expiration date
-    if (formData.expires_at && formData.expires_at <= new Date()) {
-      setError("Expiration date must be in the future");
-      return false;
-    }
-
-    return true;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!user) {
-      setError("You must be logged in to create a poll");
-      return;
-    }
-
-    if (!validateForm()) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const supabase = createClientSupabase();
-
-      // Get the current session to ensure we have a valid token
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session) {
-        setError("Authentication expired. Please log in again.");
-        return;
-      }
-
-      const validOptions = formData.options.filter((option) => option.trim());
-
       const pollData = {
         ...formData,
-        options: validOptions,
-        description: formData.description || undefined,
+        description: formData.description || null,
       };
 
-      const response = await fetch("/api/polls", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(pollData),
-      });
+      const result = await createPollAction(pollData);
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to create poll");
-      }
-
-      const { poll } = await response.json();
-
-      if (onSuccess) {
-        onSuccess(poll.id);
+      if (result.success && result.poll) {
+        if (onSuccess) {
+          onSuccess(result.poll.id);
+        } else {
+          setCreatedPoll(result.poll);
+        }
       } else {
-        setCreatedPoll(poll);
+        setError(result.error || "Failed to create poll");
       }
     } catch (error) {
       setError(
