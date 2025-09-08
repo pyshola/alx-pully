@@ -2,8 +2,30 @@ import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { Database } from '@/types/database'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from 'ioredis'
+
+const redis = new Redis(process.env.UPSTASH_REDIS_URL!)
+
+const ratelimit = new Ratelimit({
+  redis,
+  limiter: Ratelimit.tokenBucket(10, '10 s', 10),
+})
 
 export async function middleware(req: NextRequest) {
+  const ip = req.ip ?? 'anonymous'
+  const { success, limit, remaining, reset } = await ratelimit.limit(ip)
+
+  if (!success) {
+    return new NextResponse('Too many requests.', {
+      status: 429,
+      headers: {
+        'X-RateLimit-Limit': limit.toString(),
+        'X-RateLimit-Remaining': remaining.toString(),
+        'X-RateLimit-Reset': reset.toString(),
+      },
+    })
+  }
   const res = NextResponse.next()
   const supabase = createMiddlewareClient<Database>({ req, res })
 

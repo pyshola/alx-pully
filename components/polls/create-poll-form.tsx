@@ -17,7 +17,6 @@ import {
 
 import { CreatePollForm as CreatePollFormType, Poll } from "@/types/database";
 import { PollCreatedSuccess } from "./poll-created-success";
-import { createPollAction } from "@/lib/actions/poll";
 
 interface CreatePollFormProps {
   onSuccess?: (pollId: string) => void;
@@ -106,9 +105,17 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
         description: formData.description || null,
       };
 
-      const result = await createPollAction(pollData);
+      const response = await fetch("/api/polls/create", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(pollData),
+      });
 
-      if (result.success && result.poll) {
+      const result = await response.json();
+
+      if (response.ok) {
         if (onSuccess) {
           onSuccess(result.poll.id);
         } else {
