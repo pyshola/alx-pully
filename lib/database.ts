@@ -29,7 +29,42 @@ export class DatabaseError extends Error {
   }
 }
 
-// Poll-related functions
+/**
+ * DatabaseError is a custom error class for database-related errors.
+ *
+ * Assumptions:
+ * - Used to distinguish database errors from other errors.
+ *
+ * Edge Cases:
+ * - Accepts an optional error code for more granular error handling.
+ *
+ * Connections:
+ * - Thrown by all database functions in this module.
+ */
+export class DatabaseError extends Error {
+  constructor(
+    message: string,
+    public code?: string,
+  ) {
+    super(message);
+    this.name = "DatabaseError";
+  }
+}
+
+/**
+ * createPoll inserts a new poll and its options into the database.
+ *
+ * Assumptions:
+ * - pollData contains at least two options.
+ * - userId is a valid authenticated user.
+ *
+ * Edge Cases:
+ * - Throws DatabaseError if poll or options creation fails.
+ * - Handles transaction-like logic for poll and options.
+ *
+ * Connections:
+ * - Used by API routes or server actions to create polls.
+ */
 export async function createPoll(
   pollData: CreatePollForm,
   userId: string,
@@ -88,6 +123,20 @@ export async function createPoll(
   }
 }
 
+/**
+ * getPoll fetches a poll with its creator, options, vote counts, and user vote.
+ *
+ * Assumptions:
+ * - pollId is a valid poll UUID.
+ * - userId is optional; if provided, fetches the user's vote.
+ *
+ * Edge Cases:
+ * - Returns null if poll not found (PGRST116).
+ * - Throws DatabaseError for other errors.
+ *
+ * Connections:
+ * - Used to display poll details and voting state in UI.
+ */
 export async function getPoll(
   pollId: string,
   userId?: string,
@@ -172,6 +221,20 @@ export async function getPoll(
   }
 }
 
+/**
+ * getPollResults retrieves poll results using a database RPC function.
+ *
+ * Assumptions:
+ * - pollId is a valid poll UUID.
+ * - The "get_poll_results" RPC is defined in the database.
+ *
+ * Edge Cases:
+ * - Returns an empty array if no results.
+ * - Throws DatabaseError on error.
+ *
+ * Connections:
+ * - Used to display poll results in the UI.
+ */
 export async function getPollResults(pollId: string): Promise<PollResult[]> {
   const supabase = createServerSupabase();
 
@@ -196,6 +259,19 @@ export async function getPollResults(pollId: string): Promise<PollResult[]> {
   }
 }
 
+/**
+ * getPolls fetches a list of polls with optional filters, ordering, and pagination.
+ *
+ * Assumptions:
+ * - Options may include userId, isPublic, search, limit, offset, orderBy, orderDirection.
+ *
+ * Edge Cases:
+ * - Returns an empty array if no polls found.
+ * - Throws DatabaseError on error.
+ *
+ * Connections:
+ * - Used for poll listings, dashboards, and search.
+ */
 export async function getPolls(options?: {
   userId?: string;
   isPublic?: boolean;
@@ -313,6 +389,20 @@ export async function getPolls(options?: {
   }
 }
 
+/**
+ * getPopularPolls fetches the most popular polls based on a popularity score.
+ *
+ * Assumptions:
+ * - The "popular_polls" view/table exists in the database.
+ * - limit specifies the maximum number of polls to return.
+ *
+ * Edge Cases:
+ * - Returns an empty array if no popular polls.
+ * - Throws DatabaseError on error.
+ *
+ * Connections:
+ * - Used for home page or trending polls sections.
+ */
 export async function getPopularPolls(
   limit: number = 10,
 ): Promise<PopularPoll[]> {
@@ -343,6 +433,19 @@ export async function getPopularPolls(
   }
 }
 
+/**
+ * updatePoll updates a poll's fields if the user is the creator.
+ *
+ * Assumptions:
+ * - pollId and userId are valid and match an existing poll.
+ * - updates contains valid poll fields.
+ *
+ * Edge Cases:
+ * - Throws DatabaseError if update fails or poll not found.
+ *
+ * Connections:
+ * - Used by poll editing features in the UI.
+ */
 export async function updatePoll(
   pollId: string,
   updates: PollUpdate,
@@ -375,6 +478,18 @@ export async function updatePoll(
   }
 }
 
+/**
+ * deletePoll deletes a poll if the user is the creator.
+ *
+ * Assumptions:
+ * - pollId and userId are valid and match an existing poll.
+ *
+ * Edge Cases:
+ * - Throws DatabaseError if deletion fails.
+ *
+ * Connections:
+ * - Used by poll deletion features in the UI.
+ */
 export async function deletePoll(
   pollId: string,
   userId: string,
@@ -402,7 +517,20 @@ export async function deletePoll(
   }
 }
 
-// Vote-related functions
+/**
+ * castVote inserts votes for a poll, handling multiple/single vote logic.
+ *
+ * Assumptions:
+ * - voteData contains poll_id, option_ids, and optionally voter_fingerprint.
+ * - userId is optional for anonymous voting.
+ *
+ * Edge Cases:
+ * - Checks for poll expiration and multiple vote rules.
+ * - Throws DatabaseError on error.
+ *
+ * Connections:
+ * - Used by voting UI to submit user votes.
+ */
 export async function castVote(
   voteData: VoteForm,
   userId?: string,
@@ -475,6 +603,20 @@ export async function castVote(
   }
 }
 
+/**
+ * getUserVote fetches the user's vote(s) for a poll, by userId or fingerprint.
+ *
+ * Assumptions:
+ * - pollId is valid.
+ * - userId or fingerprint is provided.
+ *
+ * Edge Cases:
+ * - Returns an empty array if no vote found.
+ * - Throws DatabaseError on error.
+ *
+ * Connections:
+ * - Used to show user's voting state in poll UI.
+ */
 export async function getUserVote(
   pollId: string,
   userId?: string,
@@ -511,7 +653,20 @@ export async function getUserVote(
   }
 }
 
-// Analytics functions
+/**
+ * recordPollView logs a poll view for analytics, using userId or fingerprint.
+ *
+ * Assumptions:
+ * - pollId is valid.
+ * - userId or fingerprint is provided.
+ *
+ * Edge Cases:
+ * - Silently ignores duplicate key errors (unique constraint).
+ * - Logs but does not throw on other errors.
+ *
+ * Connections:
+ * - Used for analytics and popularity tracking.
+ */
 export async function recordPollView(
   pollId: string,
   userId?: string,
@@ -544,6 +699,20 @@ export async function recordPollView(
   }
 }
 
+/**
+ * getUserPollStats retrieves poll statistics for a user via a database RPC.
+ *
+ * Assumptions:
+ * - userId is valid.
+ * - The "get_user_poll_stats" RPC is defined in the database.
+ *
+ * Edge Cases:
+ * - Returns null if no stats found.
+ * - Throws DatabaseError on error.
+ *
+ * Connections:
+ * - Used for user dashboards and analytics.
+ */
 export async function getUserPollStats(
   userId: string,
 ): Promise<UserPollStats | null> {
@@ -570,6 +739,18 @@ export async function getUserPollStats(
   }
 }
 
+/**
+ * refreshPopularPolls triggers a database RPC to refresh popular polls cache.
+ *
+ * Assumptions:
+ * - The "refresh_popular_polls" RPC is defined in the database.
+ *
+ * Edge Cases:
+ * - Throws DatabaseError on error.
+ *
+ * Connections:
+ * - Used by scheduled jobs or admin actions to update popular polls.
+ */
 export async function refreshPopularPolls(): Promise<void> {
   const supabase = createServerSupabase();
 
@@ -592,7 +773,18 @@ export async function refreshPopularPolls(): Promise<void> {
   }
 }
 
-// Utility functions
+/**
+ * generateFingerprint creates a browser fingerprint for anonymous voting/tracking.
+ *
+ * Assumptions:
+ * - Runs in a browser environment.
+ *
+ * Edge Cases:
+ * - Uses simple hashing; not cryptographically secure.
+ *
+ * Connections:
+ * - Used for anonymous vote and view tracking.
+ */
 export function generateFingerprint(): string {
   // Generate a simple fingerprint based on available browser information
   const canvas = document.createElement("canvas");
@@ -625,6 +817,19 @@ export function generateFingerprint(): string {
   return Math.abs(hash).toString(36);
 }
 
+/**
+ * canUserVote determines if a user is allowed to vote in a poll.
+ *
+ * Assumptions:
+ * - poll is a valid Poll object.
+ * - userVote is an array of Vote objects or undefined.
+ *
+ * Edge Cases:
+ * - Returns false if poll expired or user already voted (and multiple votes not allowed).
+ *
+ * Connections:
+ * - Used to enable/disable voting UI.
+ */
 export function canUserVote(poll: Poll, userVote?: Vote[]): boolean {
   // Check if poll has expired
   if (poll.expires_at && new Date(poll.expires_at) < new Date()) {
@@ -639,6 +844,19 @@ export function canUserVote(poll: Poll, userVote?: Vote[]): boolean {
   return true;
 }
 
+/**
+ * getPollStatus returns the status of a poll ("active", "expired", or "draft").
+ *
+ * Assumptions:
+ * - poll is a valid Poll object.
+ *
+ * Edge Cases:
+ * - Returns "expired" if poll has expired.
+ * - Returns "draft" if poll is not public.
+ *
+ * Connections:
+ * - Used to display poll status in UI.
+ */
 export function getPollStatus(poll: Poll): "active" | "expired" | "draft" {
   if (poll.expires_at && new Date(poll.expires_at) < new Date()) {
     return "expired";

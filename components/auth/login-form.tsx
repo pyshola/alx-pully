@@ -22,6 +22,23 @@ interface LoginFormProps {
   redirectTo?: string;
 }
 
+/**
+ * LoginForm renders a login form and handles user authentication.
+ *
+ * Assumptions:
+ * - The Supabase client is configured and available.
+ * - The parent is wrapped in AuthProvider.
+ * - Optionally receives a redirectTo prop or uses search params.
+ *
+ * Edge Cases:
+ * - Displays error messages for invalid credentials, unconfirmed email, or unexpected errors.
+ * - Handles disabled state while loading.
+ *
+ * Connections:
+ * - Uses useAuth() for loading state.
+ * - Uses Supabase for authentication.
+ * - Navigates with Next.js router after successful login.
+ */
 export function LoginForm({ redirectTo }: LoginFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -36,6 +53,18 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
   const finalRedirectTo =
     redirectTo || searchParams.get("redirectTo") || "/dashboard";
 
+  /**
+   * handleInputChange updates form state on input change and clears errors.
+   *
+   * Assumptions:
+   * - Input fields have name attributes matching formData keys.
+   *
+   * Edge Cases:
+   * - Resets error state on any input change.
+   *
+   * Connections:
+   * - Used as onChange handler for email and password fields.
+   */
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -45,6 +74,19 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
     if (error) setError(null);
   };
 
+  /**
+   * validateForm checks if the form fields are valid.
+   *
+   * Assumptions:
+   * - Email and password fields are required.
+   * - Uses isValidEmail utility for email validation.
+   *
+   * Edge Cases:
+   * - Sets error messages for missing or invalid input.
+   *
+   * Connections:
+   * - Called before attempting authentication.
+   */
   const validateForm = (): boolean => {
     if (!formData.email.trim()) {
       setError("Email is required");
@@ -64,6 +106,21 @@ export function LoginForm({ redirectTo }: LoginFormProps) {
     return true;
   };
 
+  /**
+   * handleSubmit processes the login form submission.
+   *
+   * Assumptions:
+   * - Form is valid before attempting authentication.
+   * - Supabase signInWithPassword returns an error object on failure.
+   *
+   * Edge Cases:
+   * - Handles specific Supabase error messages for invalid credentials and unconfirmed email.
+   * - Handles unexpected errors with a generic message.
+   *
+   * Connections:
+   * - Called on form submit.
+   * - Redirects user on successful login.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 

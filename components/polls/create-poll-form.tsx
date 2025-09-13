@@ -22,6 +22,24 @@ interface CreatePollFormProps {
   onSuccess?: (pollId: string) => void;
 }
 
+/**
+ * CreatePollForm renders a form for creating a new poll.
+ *
+ * Assumptions:
+ * - The parent component may provide an onSuccess callback.
+ * - The user is authenticated if required by the API.
+ * - The API endpoint /api/polls/create is available and returns a poll object on success.
+ *
+ * Edge Cases:
+ * - Handles API/network errors and displays error messages.
+ * - Prevents adding more than 10 options or removing below 2 options.
+ * - Handles optional fields (description, expiration date).
+ *
+ * Connections:
+ * - Uses PollCreatedSuccess to display success state.
+ * - Calls onSuccess or sets createdPoll state after successful creation.
+ * - Interacts with Next.js router for navigation.
+ */
 export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
@@ -36,6 +54,19 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
     allow_anonymous_votes: true,
   });
 
+  /**
+   * handleInputChange updates formData state for text, checkbox, and datetime-local inputs.
+   *
+   * Assumptions:
+   * - Input name matches a key in formData.
+   *
+   * Edge Cases:
+   * - Handles clearing error state on change.
+   * - Converts datetime-local input to Date object or null.
+   *
+   * Connections:
+   * - Used as onChange handler for all form fields except poll options.
+   */
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
   ) => {
@@ -63,6 +94,18 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
     if (error) setError(null);
   };
 
+  /**
+   * handleOptionChange updates a specific poll option by index.
+   *
+   * Assumptions:
+   * - Index is within the bounds of the options array.
+   *
+   * Edge Cases:
+   * - Handles clearing error state on change.
+   *
+   * Connections:
+   * - Used as onChange handler for poll option inputs.
+   */
   const handleOptionChange = (index: number, value: string) => {
     const newOptions = [...formData.options];
     newOptions[index] = value;
@@ -74,6 +117,18 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
     if (error) setError(null);
   };
 
+  /**
+   * addOption adds a new empty option to the poll, up to a maximum of 10.
+   *
+   * Assumptions:
+   * - Options array has fewer than 10 items.
+   *
+   * Edge Cases:
+   * - Does nothing if already at 10 options.
+   *
+   * Connections:
+   * - Called when the user clicks "Add Option".
+   */
   const addOption = () => {
     if (formData.options.length < 10) {
       setFormData((prev) => ({
@@ -83,6 +138,18 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
     }
   };
 
+  /**
+   * removeOption removes a poll option by index, but keeps at least 2 options.
+   *
+   * Assumptions:
+   * - Options array has more than 2 items.
+   *
+   * Edge Cases:
+   * - Does nothing if only 2 options remain.
+   *
+   * Connections:
+   * - Called when the user clicks the remove button for an option.
+   */
   const removeOption = (index: number) => {
     if (formData.options.length > 2) {
       const newOptions = formData.options.filter((_, i) => i !== index);
@@ -93,6 +160,20 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
     }
   };
 
+  /**
+   * handleSubmit sends the poll data to the API and handles the response.
+   *
+   * Assumptions:
+   * - The API endpoint /api/polls/create expects JSON and returns a poll object on success.
+   *
+   * Edge Cases:
+   * - Handles network or server errors.
+   * - Handles missing or invalid fields as reported by the API.
+   *
+   * Connections:
+   * - Called on form submit.
+   * - Calls onSuccess callback or sets createdPoll state on success.
+   */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -133,6 +214,18 @@ export function CreatePollForm({ onSuccess }: CreatePollFormProps) {
     }
   };
 
+  /**
+   * handleCreateAnother resets the form and error state to allow creating a new poll.
+   *
+   * Assumptions:
+   * - Called after a poll has been successfully created.
+   *
+   * Edge Cases:
+   * - Resets all form fields and error state.
+   *
+   * Connections:
+   * - Passed to PollCreatedSuccess as onCreateAnother.
+   */
   const handleCreateAnother = () => {
     setCreatedPoll(null);
     setFormData({

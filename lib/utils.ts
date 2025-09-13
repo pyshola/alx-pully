@@ -1,10 +1,34 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
+/**
+ * cn merges Tailwind CSS class names conditionally.
+ *
+ * Assumptions:
+ * - Accepts any number of class values (strings, arrays, objects).
+ *
+ * Edge Cases:
+ * - Handles falsy values and deduplicates classes.
+ *
+ * Connections:
+ * - Used throughout UI components for dynamic class names.
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * formatDate formats a date as "Month Day, Year" (e.g., "January 1, 2024").
+ *
+ * Assumptions:
+ * - Accepts a Date object or ISO date string.
+ *
+ * Edge Cases:
+ * - Returns "Invalid Date" if input is not a valid date.
+ *
+ * Connections:
+ * - Used to display poll creation or expiration dates.
+ */
 export function formatDate(date: Date | string): string {
   const d = new Date(date);
   return d.toLocaleDateString("en-US", {
@@ -14,6 +38,18 @@ export function formatDate(date: Date | string): string {
   });
 }
 
+/**
+ * formatDateTime formats a date as "Month Day, Year, HH:MM" (e.g., "January 1, 2024, 12:00").
+ *
+ * Assumptions:
+ * - Accepts a Date object or ISO date string.
+ *
+ * Edge Cases:
+ * - Returns "Invalid Date" if input is not a valid date.
+ *
+ * Connections:
+ * - Used to display poll timestamps with time.
+ */
 export function formatDateTime(date: Date | string): string {
   const d = new Date(date);
   return d.toLocaleDateString("en-US", {
@@ -25,11 +61,35 @@ export function formatDateTime(date: Date | string): string {
   });
 }
 
+/**
+ * calculatePercentage returns the percentage (rounded) of part/total.
+ *
+ * Assumptions:
+ * - part and total are numbers.
+ *
+ * Edge Cases:
+ * - Returns 0 if total is 0.
+ *
+ * Connections:
+ * - Used to display poll option vote percentages.
+ */
 export function calculatePercentage(part: number, total: number): number {
   if (total === 0) return 0;
   return Math.round((part / total) * 100);
 }
 
+/**
+ * generateSlug creates a URL-friendly slug from a string.
+ *
+ * Assumptions:
+ * - Input is a string.
+ *
+ * Edge Cases:
+ * - Removes special characters and trims hyphens.
+ *
+ * Connections:
+ * - Used for poll URLs or identifiers.
+ */
 export function generateSlug(text: string): string {
   return text
     .toLowerCase()
@@ -38,16 +98,52 @@ export function generateSlug(text: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+/**
+ * isValidEmail validates an email address format.
+ *
+ * Assumptions:
+ * - Input is a string.
+ *
+ * Edge Cases:
+ * - Returns false for invalid or empty strings.
+ *
+ * Connections:
+ * - Used in authentication and registration forms.
+ */
 export function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
 }
 
+/**
+ * truncateText shortens text to a max length, adding ellipsis if needed.
+ *
+ * Assumptions:
+ * - text is a string, maxLength is a positive integer.
+ *
+ * Edge Cases:
+ * - Returns original text if shorter than maxLength.
+ *
+ * Connections:
+ * - Used to limit text in UI (e.g., poll titles, descriptions).
+ */
 export function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
   return text.slice(0, maxLength) + "...";
 }
 
+/**
+ * debounce returns a debounced version of a function.
+ *
+ * Assumptions:
+ * - func is a function, delay is in milliseconds.
+ *
+ * Edge Cases:
+ * - Only the last call within the delay is executed.
+ *
+ * Connections:
+ * - Used for search inputs or actions that should not fire rapidly.
+ */
 export function debounce<T extends (...args: any[]) => void>(
   func: T,
   delay: number,
@@ -59,6 +155,18 @@ export function debounce<T extends (...args: any[]) => void>(
   };
 }
 
+/**
+ * getTimeRemaining calculates time left until a given expiration date.
+ *
+ * Assumptions:
+ * - expiresAt is a Date object or string.
+ *
+ * Edge Cases:
+ * - Returns expired=true if date is in the past.
+ *
+ * Connections:
+ * - Used to show countdowns for poll expiration.
+ */
 export function getTimeRemaining(expiresAt: Date): {
   total: number;
   days: number;
@@ -97,6 +205,19 @@ export function getTimeRemaining(expiresAt: Date): {
   };
 }
 
+/**
+ * shareUrl generates a shareable URL for a poll.
+ *
+ * Assumptions:
+ * - pollId is a string.
+ * - Runs in browser or server environment.
+ *
+ * Edge Cases:
+ * - Falls back to relative URL if window is undefined (SSR).
+ *
+ * Connections:
+ * - Used for sharing polls via UI.
+ */
 export function shareUrl(pollId: string): string {
   if (typeof window !== "undefined") {
     return `${window.location.origin}/polls/${pollId}`;
@@ -104,6 +225,19 @@ export function shareUrl(pollId: string): string {
   return `/polls/${pollId}`;
 }
 
+/**
+ * copyToClipboard copies text to the user's clipboard.
+ *
+ * Assumptions:
+ * - text is a string.
+ *
+ * Edge Cases:
+ * - Uses fallback for browsers without navigator.clipboard.
+ * - Returns a promise resolving to true/false for success.
+ *
+ * Connections:
+ * - Used in share dialogs and UI copy buttons.
+ */
 export function copyToClipboard(text: string): Promise<boolean> {
   if (navigator.clipboard && navigator.clipboard.writeText) {
     return navigator.clipboard
@@ -129,6 +263,18 @@ export function copyToClipboard(text: string): Promise<boolean> {
   }
 }
 
+/**
+ * validatePassword checks password strength and returns validation results.
+ *
+ * Assumptions:
+ * - password is a string.
+ *
+ * Edge Cases:
+ * - Returns multiple errors for weak passwords.
+ *
+ * Connections:
+ * - Used in registration and password reset forms.
+ */
 export function validatePassword(password: string): {
   isValid: boolean;
   errors: string[];
